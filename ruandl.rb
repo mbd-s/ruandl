@@ -12,7 +12,7 @@ def check_date_range
     puts "We can't see into the future...yet.\nPlease enter a date before today."
   else
     @start_date = date_to_check
-    build_url
+    print_url
   end
 end
 
@@ -22,7 +22,7 @@ def check_date_format
   if Date.valid_date? y.to_i, m.to_i, d.to_i
     check_date_range
   else
-    puts "#{y}-#{m}-#{d} is not a valid date.\nPlease enter a date in the format YYYY-MM-DD."
+    puts "#{y}-#{m}-#{d} is not a valid date.\nPlease make sure you're using the format YYYY-MM-DD."
   end
 end
 
@@ -38,10 +38,10 @@ def check_stock_format
   end
 end
 
-def build_url
-  @end_date = DateTime.now.strftime '%F'
-  puts "Checking #{ @stock_symbol } from #{ @start_date } to today (#{ @end_date })."
-  puts "https://www.quandl.com/api/v3/datasets/WIKI/#{ @stock_symbol }.json?start_date=#{ @start_date }&end_date=#{ @end_date }&api_key=#{ ENV['QUANDL_API_KEY'] }"
+def print_url
+  puts "Checking data for #{ @stock_symbol } from #{ @start_date } to today (#{ DateTime.now.strftime '%F' })."
+  @url = "https://www.quandl.com/api/v3/datasets/WIKI/#{ @stock_symbol }.json?start_date=#{ @start_date }&end_date=#{ @end_date }&api_key=#{ ENV['QUANDL_API_KEY'] }"
+  puts @url
 end
 
 check_stock_format
