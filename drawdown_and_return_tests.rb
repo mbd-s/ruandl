@@ -6,7 +6,7 @@ def total_return_calculator
   puts "The total return was #{total_return}%."
 end
 
-#TODO figure out how to capture relative peaks and troughs so pctg calc works
+#TODO capture relative peaks and troughs so pctg calc works
 def max_drawdown_calculator
   max_drawdown = 0
   peak = 0
