@@ -108,7 +108,7 @@ class Quandl
 end
 
 # #TODO error handling
-# #TODO replace check_date_range with oldest_available_date; replace today with newest_available_date
+# #TODO replace get_date with oldest_available_date; replace today conditionally with newest_available_date
 if get_stock && get_date
   prices = Quandl.get_prices get_stock, get_date
   total_return = calc_total_return prices
@@ -135,13 +135,12 @@ client = Twitter::REST::Client.new do |config|
   config.access_token_secret = ENV["TWITTER_ACCESS_TOKEN_SECRET"]
 end
 
+client.update(status)
+
 last_tweet = client.user_timeline("quandlbot").first.uri
 puts "I've found the data you're looking for: #{last_tweet}"
 
-
 input_check
-
-# check_stock_format
 
 #prompts user for a date
 # def get_date
