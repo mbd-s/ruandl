@@ -62,7 +62,6 @@ def input_check
     puts "I can look up returns and maximum drawdowns of any stock in the Quandl database. To start, run this program with a stock symbol (e.g., AAPL) and a date (e.g. 1990-12-20) as arguments."
   end
 end
-# input_check
 
 class Quandl
   include HTTParty
@@ -72,14 +71,11 @@ class Quandl
 
   attr_accessor :stock, :start_date, :end_date
 
-
-
   def initialize(stock, start_date, end_date)
     self.stock = stock
     self.start_date = start_date
     self.end_date = end_date
   end
-
 
   #checks the metadata for a stock input
   def self.check_metadata stock
@@ -104,17 +100,13 @@ class Quandl
     end
   end
 
-  def base_path
-    "/.json?#{ api_key }"
-  end
-
-
 end
 
 prices = Quandl.get_prices "FB", "2016-01-05", "2016-01-10"
-total_return_calculator prices
-max_dd_calculator prices
-
+a = calc_total_return prices
+b = calc_max_dd prices
+puts "total return: #{a}"
+puts "max dd: #{b}"
 
 def date_check stock
   earliest_date = Date.parse(Quandl.check_metadata stock)
@@ -131,15 +123,6 @@ end
 # if @stock_input
 #   date_check @stock_input
 # end
-
-#
-
-
-# prices_test_arr = [ 500000, 750000, 400000, 600000, 350000, 800000 ]
-# total_return_calculator prices_test_arr
-# max_dd_calculator prices_test_arr
-
-#TODO reset at end(?)
 
 
 #prompts user for a date
