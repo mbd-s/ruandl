@@ -1,60 +1,63 @@
 require 'httparty'
 require 'dotenv'
 require 'date'
-load 'drawdown_and_return.rb'
+require 'twitter'
 
+load 'calculations.rb'
 Dotenv.load
 
 #check for 2 inputs
 #if there are 2 inputs
   #check input date format
-  #check input stock format
     #if invalid, return
     #if valid, check if input stock is in db
       #if not in db, return
-      #if in db, return earliest_date
-        #if requested date is before earliest_date, return
-        #if requested date is on or after earliest date, call drawdown_and_return
+      #if in db, return earliest_date and call drawdown_and_return
 
 #checks that input date is in the past
+#TODO fix: check isn't necessary, since API responds to dates outside range
 #TODO check if date is within allowable range (i.e., after oldest_available_date)
-def check_date_range
-  start_date = Date.parse ARGV[1]
-  if start_date >= Date.today
-    puts "We can't see into the future...yet.\nPlease enter a date before today."
-  else
-    start_date
-  end
-end
+# def check_date_range
+#   start_date = Date.parse ARGV[1]
+#   if start_date >= Date.today
+#     puts "We can't see into the future...yet.\nPlease enter a date before today."
+#   else
+#     start_date
+#   end
+# end
 
-#checks if input date is in required format (YYYY-MM-DD)
-def check_date_format
-  y, m, d = ARGV[1].split "-"
-  if Date.valid_date? y.to_i, m.to_i, d.to_i
-    check_date_range
+def input_check
+  if ARGV[0] && ARGV[1]
+    get_stock
   else
-    puts "#{y}-#{m}-#{d} is not a valid date.\nPlease make sure you're using the
-    format YYYY-MM-DD."
+    puts "I can look up returns and maximum drawdowns of any stock in the Quandl database. To start, run this program with a stock symbol (e.g., AAPL) and a date (e.g. 1990-12-20) as arguments."
   end
 end
 
 #checks if stock input is in the right format
 #TODO check if stock input matches a Quandl dataset code
-def check_stock_format
-  stock_input = ARGV[0].upcase
-  if stock_input.match(/^(?!_)[a-zA-Z_]{1,5}(?<!_)$/) == nil
+def get_stock
+  stock = ARGV[0].upcase
+  if stock.match(/^(?!_)[a-zA-Z_]{1,5}(?<!_)$/) == nil
     puts "That's the wrong format for a stock dataset. You can download the full
     list from Quandl: https://www.quandl.com/api/v3/databases/wiki/codes"
+    return false
   else
-    stock_input
+    get_date
+    stock
   end
 end
 
-def input_check
-  if ARGV[0]
-    check_stock_format
+#checks if input date is in required format (YYYY-MM-DD)
+def get_date
+  y, m, d = ARGV[1].split "-"
+  if Date.valid_date? y.to_i, m.to_i, d.to_i
+    start_date = Date.parse ARGV[1]
+    start_date
   else
-    puts "I can look up returns and maximum drawdowns of any stock in the Quandl database. To start, run this program with a stock symbol (e.g., AAPL) and a date (e.g. 1990-12-20) as arguments."
+    puts "#{y}-#{m}-#{d} is not a valid date.\nPlease make sure you're using the
+    format YYYY-MM-DD."
+    return false
   end
 end
 
@@ -83,13 +86,14 @@ class Quandl
   end
 
   #TODO fix whatever is making this break without the print line
-  def self.end_date
-    end_date = Time.now.strftime("%m-%d-%Y")
-    puts "hi"
-  end
+  #or maybe not necessary since api call works w/o end date
+  # def self.end_date
+  #   end_date = Time.now.strftime("%m-%d-%Y")
+  #   puts "hi"
+  # end
 
   def self.get_prices stock, start_date
-    response = get("/#{ stock }.json?column_index=4&start_date=#{ start_date }&end_date=#{ end_date }")
+    response = get("/#{ stock }.json?column_index=4&start_date=#{ start_date }")
     if response.success?
       prices = Array.new
       response["dataset"]["data"].reverse_each do |r|
@@ -103,11 +107,17 @@ class Quandl
 
 end
 
-prices = Quandl.get_prices check_stock_format, check_date_range
-a = calc_total_return prices
-b = calc_max_dd prices
-puts "From #{check_date_range} to today, #{check_stock_format} generated a return of #{a}%, with a maximum drawdown of #{b}%."
+# #TODO error handling
+# #TODO replace check_date_range with oldest_available_date; replace today with newest_available_date
+if get_stock && get_date
+  prices = Quandl.get_prices get_stock, get_date
+  total_return = calc_total_return prices
+  max_dd = calc_max_dd prices
+  status = "From #{get_date} to today, #{get_stock} generated a return of #{total_return}%, with a maximum drawdown of #{max_dd}%."
+  status
+end
 
+#not necessary, since API call automatically only goes back as far as there are records
 def date_check stock
   earliest_date = Date.parse(Quandl.check_metadata stock)
   input_date = Date.parse ARGV[1]
@@ -118,14 +128,20 @@ def date_check stock
   end
 end
 
-# input_check
+client = Twitter::REST::Client.new do |config|
+  config.consumer_key        = ENV["TWITTER_CONSUMER_KEY"]
+  config.consumer_secret     = ENV["TWITTER_CONSUMER_SECRET"]
+  config.access_token        = ENV["TWITTER_ACCESS_TOKEN"]
+  config.access_token_secret = ENV["TWITTER_ACCESS_TOKEN_SECRET"]
+end
+
+last_tweet = client.user_timeline("quandlbot").first.uri
+puts "I've found the data you're looking for: #{last_tweet}"
+
+
+input_check
 
 # check_stock_format
-#
-# if @stock_input
-#   date_check @stock_input
-# end
-
 
 #prompts user for a date
 # def get_date
