@@ -5,23 +5,25 @@ load 'drawdown_and_return.rb'
 
 Dotenv.load
 
-#check input stock format
-  #if invalid, return
-  #if valid, check if input stock is in db
-    #if not in db, return
-    #if in db, return earliest_date
-      #if requested date is before earliest_date, return
-      #if requested date is on or after earliest date, call drawdown_and_return
+#check for 2 inputs
+#if there are 2 inputs
+  #check input date format
+  #check input stock format
+    #if invalid, return
+    #if valid, check if input stock is in db
+      #if not in db, return
+      #if in db, return earliest_date
+        #if requested date is before earliest_date, return
+        #if requested date is on or after earliest date, call drawdown_and_return
 
 #checks that input date is in the past
 #TODO check if date is within allowable range (i.e., after oldest_available_date)
 def check_date_range
-  date_to_check = Date.parse ARGV[1]
-  if date_to_check >= Date.today
+  start_date = Date.parse ARGV[1]
+  if start_date >= Date.today
     puts "We can't see into the future...yet.\nPlease enter a date before today."
   else
-    @start_date = date_to_check
-    print_url
+    start_date
   end
 end
 
@@ -44,15 +46,8 @@ def check_stock_format
     puts "That's the wrong format for a stock dataset. You can download the full
     list from Quandl: https://www.quandl.com/api/v3/databases/wiki/codes"
   else
-    @stock_input = stock_input
+    stock_input
   end
-end
-
-def print_url
-  date_today = DateTime.now.strftime '%F'
-  puts "Checking data for #{ @stock_symbol } from #{ @start_date } to today (#{ date_today })."
-  @url = "https://www.quandl.com/api/v3/datasets/WIKI/#{ @stock_symbol }.json?start_date=#{ @start_date }&end_date=#{ date_today }&api_key=#{ ENV['QUANDL_API_KEY'] }"
-  puts @url
 end
 
 def input_check
@@ -87,7 +82,13 @@ class Quandl
     end
   end
 
-  def self.get_prices stock, start_date, end_date
+  #TODO fix whatever is making this break without the print line
+  def self.end_date
+    end_date = Time.now.strftime("%m-%d-%Y")
+    puts "hi"
+  end
+
+  def self.get_prices stock, start_date
     response = get("/#{ stock }.json?column_index=4&start_date=#{ start_date }&end_date=#{ end_date }")
     if response.success?
       prices = Array.new
@@ -102,11 +103,10 @@ class Quandl
 
 end
 
-prices = Quandl.get_prices "FB", "2016-01-05", "2016-01-10"
+prices = Quandl.get_prices check_stock_format, check_date_range
 a = calc_total_return prices
 b = calc_max_dd prices
-puts "total return: #{a}"
-puts "max dd: #{b}"
+puts "From #{check_date_range} to today, #{check_stock_format} generated a return of #{a}%, with a maximum drawdown of #{b}%."
 
 def date_check stock
   earliest_date = Date.parse(Quandl.check_metadata stock)
@@ -117,6 +117,8 @@ def date_check stock
     puts "Records should be available"
   end
 end
+
+# input_check
 
 # check_stock_format
 #
