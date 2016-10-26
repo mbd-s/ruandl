@@ -1,3 +1,4 @@
 gem 'twitter'
 gem 'dotenv'
 gem 'httparty'
+gem 'highline'
