@@ -63,7 +63,7 @@ class Quandl
 
 end
 
-#check if the stock matches the basic Quandl format, then ping the db
+#if the stock matches the general Quandl format, ping the db to see if it's there
 def stock_check stock
   if stock.match(/^(?!_)[a-zA-Z_]{1,5}(?<!_)$/)
     stock_exists = Quandl.check_existence stock
@@ -73,25 +73,19 @@ end
 
 cli = HighLine.new
 
-ft = HighLine::ColorScheme.new do |cs|
-      cs[:output]        = [ :bold, :blue ]
-      cs[:alert]         = [ :bold, :red ]
-    end
+say '-'*92
+say "Hi! I can help you look up information on any stock in the Quandl database."
+say "\nIf the dates you're searching for aren't in the database, I'll only give you what I can find."
+say '-'*92
 
-HighLine.color_scheme = ft
-say("<%= color('I can look up information on any stock in the Quandl database.', :output) %>")
-say("<%= color('-'*90, :output) %>")
-say('<%= color("If the dates you\'re searching for aren\'t in the database, I\'ll only give you what I can find.", :output) %>')
-
-
-stock = cli.ask('<%= color("Please enter the ticker symbol (e.g. \'AAPL\') of the stock you\'d like to check.\n", :output) %>', String) {
+stock = cli.ask("\nPlease enter the ticker symbol (e.g. 'AAPL') of the stock you'd like to check.\n\n", String) {
   |q| q.validate = lambda { |c| stock_check c };
-  q.responses[:not_valid] = "\nThat doesn\'t seem to be a valid stock symbol. You can download the full
+  q.responses[:not_valid] = "\nThat doesn't seem to be a valid stock symbol. You can download the full
   list from Quandl: https://www.quandl.com/api/v3/databases/wiki/codes"
 }
 stock.upcase!
 
-input_date = cli.ask("\nFrom what date should I start looking for data?", Date)
+input_date = cli.ask("\nHow far back do you want data?", Date)
 
 def set_end_date stock
   newest_available_date = Date.parse(Quandl.find_newest_available_date stock)
@@ -125,6 +119,7 @@ client = Twitter::REST::Client.new do |config|
 end
 
 #and tweet the status
+#TODO try / handle timeouts
 client.update(status)
 
 #print a link to the tweet
