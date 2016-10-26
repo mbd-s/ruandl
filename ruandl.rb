@@ -7,12 +7,6 @@ require 'highline/import'
 load 'calculations.rb'
 Dotenv.load
 
-#TODO decide what to do (anything?) with command-line args
-unless ARGV.empty?
-  puts "do something with the args"
-  exit
-end
-
 class Quandl
   include HTTParty
 
@@ -27,29 +21,33 @@ class Quandl
     self.end_date = end_date
   end
 
-  #TODO add error handling (incl. refresh)
+  def self.check_existence stock
+    response = get("/#{ stock }/metadata.json")
+    if response.success?
+      true
+    else
+      false
+    end
+  end
+
   def self.find_oldest_available_date stock
     response = get("/#{ stock }/metadata.json")
     if response.success?
       response["dataset"]["oldest_available_date"]
     else
-      puts "That stock wasn't in Quandl's databse. Try your search again."
-      exit
+      raise response.response
     end
   end
 
-  #TODO add error handling (incl. refresh)
   def self.find_newest_available_date stock
     response = get("/#{ stock }/metadata.json")
     if response.success?
       response["dataset"]["newest_available_date"]
     else
-      puts "That stock wasn't in Quandl's databse. Try your search again."
-      exit
+      raise response.response
     end
   end
 
-  #TODO add error handling (incl. refresh)
   def self.get_prices stock, start_date
     response = get("/#{ stock }.json?column_index=4&start_date=#{ start_date }")
     if response.success?
@@ -59,25 +57,41 @@ class Quandl
       end
       prices
     else
-      puts "That stock wasn't in Quandl's databse. Try your search again."
+      raise response.response
     end
   end
 
 end
 
+#check if the stock matches the basic Quandl format, then ping the db
+def stock_check stock
+  if stock.match(/^(?!_)[a-zA-Z_]{1,5}(?<!_)$/)
+    stock_exists = Quandl.check_existence stock
+    stock_exists
+  end
+end
+
 cli = HighLine.new
 
-say "\nI can look up data on any stock in the Quandl database.\nIf the dates you're searching for aren't in the database, I'll only give you what I can find."
+ft = HighLine::ColorScheme.new do |cs|
+      cs[:output]        = [ :bold, :blue ]
+      cs[:alert]         = [ :bold, :red ]
+    end
 
-#TODO add validation for stock symbol
-stock = cli.ask("\nPlease enter the ticker symbol (e.g. 'AAPL') of a stock you'd like to check.\n", String) {
-  |q| q.validate = /^(?!_)[a-zA-Z_]{1,5}(?<!_)$/;
-  q.responses[:not_valid] = "\nThat doesn't look like a valid stock symbol. You can download the full
+HighLine.color_scheme = ft
+say("<%= color('I can look up information on any stock in the Quandl database.', :output) %>")
+say("<%= color('-'*90, :output) %>")
+say('<%= color("If the dates you\'re searching for aren\'t in the database, I\'ll only give you what I can find.", :output) %>')
+
+
+stock = cli.ask('<%= color("Please enter the ticker symbol (e.g. \'AAPL\') of the stock you\'d like to check.\n", :output) %>', String) {
+  |q| q.validate = lambda { |c| stock_check c };
+  q.responses[:not_valid] = "\nThat doesn\'t seem to be a valid stock symbol. You can download the full
   list from Quandl: https://www.quandl.com/api/v3/databases/wiki/codes"
 }
 stock.upcase!
 
-input_date = cli.ask("\nFrom what date would you like to start getting data?", Date)
+input_date = cli.ask("\nFrom what date should I start looking for data?", Date)
 
 def set_end_date stock
   newest_available_date = Date.parse(Quandl.find_newest_available_date stock)
@@ -113,6 +127,10 @@ end
 #and tweet the status
 client.update(status)
 
-#finally, print a link to the tweet
+#print a link to the tweet
 last_tweet = client.user_timeline("quandlbot").first.uri
 say "I think I've found the data you're looking for: #{last_tweet}"
+
+#and check for more input
+#TODO refresh
+# say "\nDo you want to look for another stock?"
