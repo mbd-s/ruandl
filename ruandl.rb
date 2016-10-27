@@ -1,8 +1,9 @@
 require 'httparty'
 require 'dotenv'
-require 'date'
+require 'chronic'
 require 'twitter'
 require 'highline/import'
+
 
 load 'calculations.rb'
 Dotenv.load
@@ -74,23 +75,37 @@ end
 #if the stock matches the general Quandl format, ping the db to see if it's there
 def stock_check stock
   if stock.match(/^(?!_)[a-zA-Z_]{1,5}(?<!_)$/)
-    stock_exists = Quandl.check_existence stock
-    stock_exists
+    Quandl.check_existence stock
+  end
+end
+
+def date_check date
+  if date.to_i >= 0 && Chronic.parse(date)
+    input_date = Chronic.parse(date)
+    yesterday = Time.now - (3600 * 24)
+    input_date <= yesterday
   end
 end
 
 cli = HighLine.new
 
-say "\n\nHi! I can help you look up the rate of return and maximum drawdown of any stock in the Quandl database within the time frame you specify.\n\n"
+say "\n\nHi! I can help you look up the rate of return and maximum drawdown of any stock in the Quandl database within a particular time frame.\n\n"
 
-stock = cli.ask("\nTo start, please enter the ticker symbol (e.g., 'AAPL') of the stock you'd like to check.\n\n", String) {
-  |q| q.validate = lambda { |c| stock_check c };
+stock = cli.ask("\nTo start, please enter the ticker symbol (e.g., 'AAPL') of the stock you'd like to check.\n\n") {
+  |q| q.validate = lambda { |s| stock_check s };
   q.responses[:not_valid] = "\nThat doesn't seem to be in Quandl's database. You can download the full
-  list of available ticker symbols here: https://www.quandl.com/api/v3/databases/wiki/codes"
+  list of available ticker symbols here: https://www.quandl.com/api/v3/databases/wiki/codes\n\n"
 }
 stock.upcase!
 
-input_date = cli.ask("\nHow far back do you want me to look?\n\nIf the date you enter is outside the range found in Quandl's records, I'll just start from the first available date.\n\n", Date)
+input_date = cli.ask("\nHow far back do you want to look?\n\n(If the date you enter is outside the range found in Quandl's records, the results will start from the first available date.)\n\n", String) {
+  |q| q.validate = lambda { |d| date_check d };
+  q.responses[:not_valid] = "\nPlease enter a valid date (e.g. '1983-10-27', 'oct 27 1983', or '33 years ago') before today.\n\n"
+}
+
+p_d = Chronic.parse(input_date).strftime('%Y-%m-%d')
+parsed_date = Date.parse(p_d)
+puts "\nOK, I'm checking $#{stock} starting from #{parsed_date.strftime("%-d %B %Y")}.\n"
 
 def set_end_date stock
   newest_available_date = Date.parse(Quandl.find_newest_available_date stock)
@@ -100,25 +115,25 @@ def set_end_date stock
   end_date
 end
 
-def set_start_date stock, input_date
+def set_start_date stock, parsed_date
   oldest_available_date = Date.parse(Quandl.find_oldest_available_date stock)
-  input_date < oldest_available_date ? start_date = oldest_available_date : start_date = input_date
+  parsed_date < oldest_available_date ? start_date = oldest_available_date : start_date = parsed_date
   start_date = start_date.strftime("%-d %B %Y")
   start_date
 end
 
-prices = Quandl.get_prices stock, input_date
+prices = Quandl.get_prices stock, parsed_date
 total_return = calc_total_return prices
 max_dd = calc_max_dd prices
 end_date = set_end_date stock
-start_date = set_start_date stock, input_date
+start_date = set_start_date stock, parsed_date
 status = "From #{start_date} to #{end_date}, $#{stock} generated a return of #{total_return}%, with a maximum drawdown of #{max_dd}%."
 
 #and tweet the status
 begin
 client.update(status)
 rescue Twitter::Error
-  puts "trying again"
+  puts "There was a problem connecting with Twitter; trying again."
   retry
 end
 
