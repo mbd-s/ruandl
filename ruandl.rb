@@ -7,6 +7,14 @@ require 'highline/import'
 load 'calculations.rb'
 Dotenv.load
 
+#connect with Twitter
+client = Twitter::REST::Client.new do |config|
+  config.consumer_key        = ENV["TWITTER_CONSUMER_KEY"]
+  config.consumer_secret     = ENV["TWITTER_CONSUMER_SECRET"]
+  config.access_token        = ENV["TWITTER_ACCESS_TOKEN"]
+  config.access_token_secret = ENV["TWITTER_ACCESS_TOKEN_SECRET"]
+end
+
 class Quandl
   include HTTParty
 
@@ -73,19 +81,16 @@ end
 
 cli = HighLine.new
 
-say '-'*92
-say "Hi! I can help you look up information on any stock in the Quandl database."
-say "\nIf the dates you're searching for aren't in the database, I'll only give you what I can find."
-say '-'*92
+say "\n\nHi! I can help you look up the rate of return and maximum drawdown of any stock in the Quandl database within the time frame you specify.\n\n"
 
-stock = cli.ask("\nPlease enter the ticker symbol (e.g. 'AAPL') of the stock you'd like to check.\n\n", String) {
+stock = cli.ask("\nTo start, please enter the ticker symbol (e.g., 'AAPL') of the stock you'd like to check.\n\n", String) {
   |q| q.validate = lambda { |c| stock_check c };
-  q.responses[:not_valid] = "\nThat doesn't seem to be a valid stock symbol. You can download the full
-  list from Quandl: https://www.quandl.com/api/v3/databases/wiki/codes"
+  q.responses[:not_valid] = "\nThat doesn't seem to be in Quandl's database. You can download the full
+  list of available ticker symbols here: https://www.quandl.com/api/v3/databases/wiki/codes"
 }
 stock.upcase!
 
-input_date = cli.ask("\nHow far back do you want data?", Date)
+input_date = cli.ask("\nHow far back do you want me to look?\n\nIf the date you enter is outside the range found in Quandl's records, I'll just start from the first available date.\n\n", Date)
 
 def set_end_date stock
   newest_available_date = Date.parse(Quandl.find_newest_available_date stock)
@@ -102,7 +107,6 @@ def set_start_date stock, input_date
   start_date
 end
 
-#TODO encapsulate
 prices = Quandl.get_prices stock, input_date
 total_return = calc_total_return prices
 max_dd = calc_max_dd prices
@@ -110,22 +114,15 @@ end_date = set_end_date stock
 start_date = set_start_date stock, input_date
 status = "From #{start_date} to #{end_date}, $#{stock} generated a return of #{total_return}%, with a maximum drawdown of #{max_dd}%."
 
-#connect with Twitter
-client = Twitter::REST::Client.new do |config|
-  config.consumer_key        = ENV["TWITTER_CONSUMER_KEY"]
-  config.consumer_secret     = ENV["TWITTER_CONSUMER_SECRET"]
-  config.access_token        = ENV["TWITTER_ACCESS_TOKEN"]
-  config.access_token_secret = ENV["TWITTER_ACCESS_TOKEN_SECRET"]
-end
-
 #and tweet the status
-#TODO try / handle timeouts
+begin
 client.update(status)
+rescue Twitter::Error
+  puts "trying again"
+  retry
+end
 
 #print a link to the tweet
 last_tweet = client.user_timeline("quandlbot").first.uri
-say "I think I've found the data you're looking for: #{last_tweet}"
-
-#and check for more input
-#TODO refresh
-# say "\nDo you want to look for another stock?"
+say "\nI think I've found the data you're looking for:\n\n#{last_tweet}\n\n"
+exit
