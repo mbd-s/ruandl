@@ -4,11 +4,10 @@ require 'chronic'
 require 'twitter'
 require 'highline/import'
 
-
 load 'calculations.rb'
 Dotenv.load
 
-#connect with Twitter
+#configure a Twitter connection
 client = Twitter::REST::Client.new do |config|
   config.consumer_key        = ENV["TWITTER_CONSUMER_KEY"]
   config.consumer_secret     = ENV["TWITTER_CONSUMER_SECRET"]
@@ -32,11 +31,7 @@ class Quandl
 
   def self.check_existence stock
     response = get("/#{ stock }/metadata.json")
-    if response.success?
-      true
-    else
-      false
-    end
+    response.success?
   end
 
   def self.find_oldest_available_date stock
@@ -79,6 +74,7 @@ def stock_check stock
   end
 end
 
+# a little fiddly because Chronic outputs Time objects
 def date_check date
   if date.to_i >= 0 && Chronic.parse(date)
     input_date = Chronic.parse(date)
@@ -122,6 +118,7 @@ def set_start_date stock, parsed_date
   start_date
 end
 
+#do the math and build the data response
 prices = Quandl.get_prices stock, parsed_date
 total_return = calc_total_return prices
 max_dd = calc_max_dd prices
