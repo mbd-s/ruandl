@@ -1,6 +1,6 @@
 **Ruandl** is a Ruby CLI that interacts with the Quandl API. It takes inputs for ticker symbols (e.g., "JCP") and dates (e.g., "2016-09-27" or "last week"). It then calculates the stock's performance over the given range, and tweets it from a custom Twitter bot (I used [@quandlbot](https://twitter.com/quandlbot)).
 
-#####Configuration
+####Configuration
 
 First, clone the repo, cd into the directory and run `bundle install`.
 
