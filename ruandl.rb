@@ -7,6 +7,7 @@ require 'highline/import'
 load 'calculations.rb'
 Dotenv.load
 
+#methods to access the Quandl db
 class Quandl
   include HTTParty
 
@@ -75,7 +76,7 @@ def date_check date
   end
 end
 
-#using highline to validate and style the CLI
+#using highline to style the CLI and help validate inputs
 cli = HighLine.new
 
 ft = HighLine::ColorScheme.new do |cs|
@@ -99,10 +100,12 @@ input_date = cli.ask('<%= color("\\nHow far back do you want to look?\\n\\n(If t
   q.responses[:not_valid] = '<%= color("\\nPlease enter a valid date (e.g. \\"1983-10-27\\", \\"oct 27 1983\\", or \\"33 years ago\\") before today.\\n", :alert) %>'
 }
 
+#turning the (valid but not formatted) date input into a Time obj, then Date obj
 p_d = Chronic.parse(input_date).strftime('%Y-%m-%d')
 parsed_date = Date.parse(p_d)
 say("<%= color('\nOK, checking $#{stock} starting from #{parsed_date.strftime("%-d %B %Y")}.\n', :output) %>")
 
+#if records stop before today, find the most recent records and only search until then
 def set_end_date stock
   newest_available_date = Date.parse(Quandl.find_newest_available_date stock)
   today = DateTime.now
@@ -111,6 +114,7 @@ def set_end_date stock
   end_date
 end
 
+#only search as far back as the oldest records
 def set_start_date stock, parsed_date
   oldest_available_date = Date.parse(Quandl.find_oldest_available_date stock)
   parsed_date < oldest_available_date ? start_date = oldest_available_date : start_date = parsed_date
@@ -118,6 +122,7 @@ def set_start_date stock, parsed_date
   start_date
 end
 
+#set up the Twitter bot
 class QuandlBot
   include Twitter
 
@@ -127,7 +132,6 @@ class QuandlBot
     self.client = client
   end
 
-  #configure the Twitter connection
   @client = Twitter::REST::Client.new do |config|
     config.consumer_key        = ENV["TWITTER_CONSUMER_KEY"]
     config.consumer_secret     = ENV["TWITTER_CONSUMER_SECRET"]
