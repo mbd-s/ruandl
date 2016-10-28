@@ -103,7 +103,6 @@ input_date = cli.ask('<%= color("\\nHow far back do you want to look?\\n\\n(If t
 #turning the (valid but not formatted) date input into a Time obj, then Date obj
 p_d = Chronic.parse(input_date).strftime('%Y-%m-%d')
 parsed_date = Date.parse(p_d)
-say("<%= color('\nOK, checking $#{stock} starting from #{parsed_date.strftime("%-d %B %Y")}.\n', :output) %>")
 
 #if records stop before today, find the most recent records and only search until then
 def set_end_date stock
@@ -167,6 +166,7 @@ total_return = calc_total_return prices
 max_dd = calc_max_dd prices
 end_date = set_end_date stock
 start_date = set_start_date stock, parsed_date
+say("<%= color('\nOK, checking $#{stock} starting from #{start_date}.\n', :output) %>")
 status = "From #{start_date} to #{end_date}, $#{stock} generated a return of #{total_return}%, with a maximum drawdown of #{max_dd}%."
 
 #tweet!
