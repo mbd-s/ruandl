@@ -7,14 +7,6 @@ require 'highline/import'
 load 'calculations.rb'
 Dotenv.load
 
-#configure a Twitter connection
-client = Twitter::REST::Client.new do |config|
-  config.consumer_key        = ENV["TWITTER_CONSUMER_KEY"]
-  config.consumer_secret     = ENV["TWITTER_CONSUMER_SECRET"]
-  config.access_token        = ENV["TWITTER_ACCESS_TOKEN"]
-  config.access_token_secret = ENV["TWITTER_ACCESS_TOKEN_SECRET"]
-end
-
 class Quandl
   include HTTParty
 
@@ -83,25 +75,33 @@ def date_check date
   end
 end
 
+#using highline to validate and style the CLI
 cli = HighLine.new
 
-say "\n\nHi! I can help you look up the rate of return and maximum drawdown of any stock in the Quandl database within a particular time frame.\n\n"
+ft = HighLine::ColorScheme.new do |cs|
+         cs[:output]          = [ :bold, :blue ]
+         cs[:alert]           = [ :bold, :red ]
+       end
+HighLine.color_scheme = ft
+say("<%= color('\nHi! I can help you look up the rate of return and maximum drawdown
+of any stock in the Quandl database within a particular time frame.\n', :output) %>")
 
-stock = cli.ask("\nTo start, please enter the ticker symbol (e.g., 'AAPL') of the stock you'd like to check.\n\n") {
+stock = cli.ask('<%= color("To start, please enter the ticker symbol (e.g., \"AAPL\")
+of the stock you\'d like to check.\\n", :output) %>') {
   |q| q.validate = lambda { |s| stock_check s };
-  q.responses[:not_valid] = "\nThat doesn't seem to be in Quandl's database. You can download the full
-  list of available ticker symbols here: https://www.quandl.com/api/v3/databases/wiki/codes\n\n"
+  q.responses[:not_valid] = '<%= color("\\nThat doesn\'t seem to be in Quandl\'s database.
+  \\nYou can download the full list of available ticker symbols here\\: https\\:\\/\\/www\\.quandl\\.com\\/api\\/v3\\/databases\\/wiki\\/codes\\n", :alert) %>'
 }
 stock.upcase!
 
-input_date = cli.ask("\nHow far back do you want to look?\n\n(If the date you enter is outside the range found in Quandl's records, the results will start from the first available date.)\n\n", String) {
+input_date = cli.ask('<%= color("\\nHow far back do you want to look?\\n\\n(If the date you enter is outside the range found in Quandl\'s records, the results will start from the first available date.)\\n", :output) %>', String) {
   |q| q.validate = lambda { |d| date_check d };
-  q.responses[:not_valid] = "\nPlease enter a valid date (e.g. '1983-10-27', 'oct 27 1983', or '33 years ago') before today.\n\n"
+  q.responses[:not_valid] = '<%= color("\\nPlease enter a valid date (e.g. \\"1983-10-27\\", \\"oct 27 1983\\", or \\"33 years ago\\") before today.\\n", :alert) %>'
 }
 
 p_d = Chronic.parse(input_date).strftime('%Y-%m-%d')
 parsed_date = Date.parse(p_d)
-puts "\nOK, I'm checking $#{stock} starting from #{parsed_date.strftime("%-d %B %Y")}.\n"
+say("<%= color('\nOK, checking $#{stock} starting from #{parsed_date.strftime("%-d %B %Y")}.\n', :output) %>")
 
 def set_end_date stock
   newest_available_date = Date.parse(Quandl.find_newest_available_date stock)
@@ -118,6 +118,45 @@ def set_start_date stock, parsed_date
   start_date
 end
 
+class QuandlBot
+  include Twitter
+
+  attr_accessor :status, :client
+  def initialize(status, client)
+    self.status = status
+    self.client = client
+  end
+
+  #configure the Twitter connection
+  @client = Twitter::REST::Client.new do |config|
+    config.consumer_key        = ENV["TWITTER_CONSUMER_KEY"]
+    config.consumer_secret     = ENV["TWITTER_CONSUMER_SECRET"]
+    config.access_token        = ENV["TWITTER_ACCESS_TOKEN"]
+    config.access_token_secret = ENV["TWITTER_ACCESS_TOKEN_SECRET"]
+  end
+
+  def self.tweet status
+    limiter = 0
+    begin
+      @client.update status
+    rescue Twitter::Error
+      say("<%= color('\nThere was a problem connecting with Twitter. Trying again.\n', :alert) %>")
+      limiter += 1
+      if limiter < 3
+        retry
+      else
+        say("<%= color('\nSorry, there was an error. Please try again.\n', :alert) %>")
+        exit
+      end
+    end
+  end
+
+  def self.check_last_tweet
+    @client.user_timeline("quandlbot").first.uri
+  end
+
+end
+
 #do the math and build the data response
 prices = Quandl.get_prices stock, parsed_date
 total_return = calc_total_return prices
@@ -126,15 +165,10 @@ end_date = set_end_date stock
 start_date = set_start_date stock, parsed_date
 status = "From #{start_date} to #{end_date}, $#{stock} generated a return of #{total_return}%, with a maximum drawdown of #{max_dd}%."
 
-#and tweet the status
-begin
-client.update(status)
-rescue Twitter::Error
-  puts "There was a problem connecting with Twitter; trying again."
-  retry
-end
+#tweet!
+QuandlBot.tweet status
 
-#print a link to the tweet
-last_tweet = client.user_timeline("quandlbot").first.uri
-say "\nI think I've found the data you're looking for:\n\n#{last_tweet}\n\n"
+#and print a link to the tweet
+last_tweet = QuandlBot.check_last_tweet
+say("<%= color('I think I\\'ve found the data you\\'re looking for: #{last_tweet}', :output) %>")
 exit
