@@ -4,61 +4,11 @@ require 'chronic'
 require 'twitter'
 require 'highline/import'
 
-load 'calculations.rb'
 Dotenv.load
 
-#methods to access the Quandl db
-class Quandl
-  include HTTParty
-
-  base_uri "https://www.quandl.com/api/v3/datasets/WIKI"
-  default_params :api_key => ENV['QUANDL_API_KEY']
-
-  attr_accessor :stock, :start_date, :end_date
-
-  def initialize(stock, start_date, end_date)
-    self.stock = stock
-    self.start_date = start_date
-    self.end_date = end_date
-  end
-
-  def self.check_existence stock
-    response = get("/#{ stock }/metadata.json")
-    response.success?
-  end
-
-  def self.find_oldest_available_date stock
-    response = get("/#{ stock }/metadata.json")
-    if response.success?
-      response["dataset"]["oldest_available_date"]
-    else
-      raise response.response
-    end
-  end
-
-  def self.find_newest_available_date stock
-    response = get("/#{ stock }/metadata.json")
-    if response.success?
-      response["dataset"]["newest_available_date"]
-    else
-      raise response.response
-    end
-  end
-
-  def self.get_prices stock, start_date
-    response = get("/#{ stock }.json?column_index=4&start_date=#{ start_date }")
-    if response.success?
-      prices = Array.new
-      response["dataset"]["data"].reverse_each do |r|
-        prices.push(r[1])
-      end
-      prices
-    else
-      raise response.response
-    end
-  end
-
-end
+require_relative 'ruandl/calculations'
+require_relative 'ruandl/quandl'
+require_relative 'ruandl/twitter'
 
 #if the stock matches the general Quandl format, ping the db to see if it's there
 def stock_check stock
@@ -97,7 +47,7 @@ stock.upcase!
 
 input_date = cli.ask('<%= color("\\nHow far back do you want to look?\\n\\n(If the date you enter is outside the range found in Quandl\'s records, the results will start from the first available date.)\\n", :output) %>', String) {
   |q| q.validate = lambda { |d| date_check d };
-  q.responses[:not_valid] = '<%= color("\\nPlease enter a valid date (e.g. \\"1983-10-27\\", \\"oct 27 1983\\", or \\"33 years ago\\") before today.\\n", :alert) %>'
+  q.responses[:not_valid] = '<%= color("\\nPlease enter a valid date (e.g., \\"1983-10-27\\", \\"oct 27 1983\\", or \\"33 years ago\\") before today.\\n", :alert) %>'
 }
 
 #turning the (valid but not formatted) date input into a Time obj, then Date obj
@@ -121,58 +71,18 @@ def set_start_date stock, parsed_date
   start_date
 end
 
-#set up the Twitter bot
-class QuandlBot
-  include Twitter
-
-  attr_accessor :status, :client
-  def initialize(status, client)
-    self.status = status
-    self.client = client
-  end
-
-  @client = Twitter::REST::Client.new do |config|
-    config.consumer_key        = ENV["TWITTER_CONSUMER_KEY"]
-    config.consumer_secret     = ENV["TWITTER_CONSUMER_SECRET"]
-    config.access_token        = ENV["TWITTER_ACCESS_TOKEN"]
-    config.access_token_secret = ENV["TWITTER_ACCESS_TOKEN_SECRET"]
-  end
-
-  def self.tweet status
-    limiter = 0
-    begin
-      @client.update status
-    rescue Twitter::Error
-      say("<%= color('\nThere was a problem connecting with Twitter. Trying again.\n', :alert) %>")
-      limiter += 1
-      if limiter < 3
-        retry
-      else
-        say("<%= color('\nSorry, there was an error. Please try again.\n', :alert) %>")
-        exit
-      end
-    end
-  end
-
-  def self.check_last_tweet
-    @client.user_timeline("quandlbot").first.uri
-  end
-
-end
-
 #do the math and build the data response
 prices = Quandl.get_prices stock, parsed_date
-total_return = calc_total_return prices
-max_dd = calc_max_dd prices
+total_return = Calculations.calc_total_return prices
+max_dd = Calculations.calc_max_dd prices
 end_date = set_end_date stock
 start_date = set_start_date stock, parsed_date
 say("<%= color('\nOK, checking $#{stock} starting from #{start_date}.\n', :output) %>")
 status = "From #{start_date} to #{end_date}, $#{stock} generated a return of #{total_return}%, with a maximum drawdown of #{max_dd}%."
 
-#tweet!
-QuandlBot.tweet status
-
+# tweet!
+TwitterBot.tweet status
 #and print a link to the tweet
-last_tweet = QuandlBot.check_last_tweet
+last_tweet = TwitterBot.check_last_tweet
 say("<%= color('I think I\\'ve found the data you\\'re looking for: #{last_tweet}', :output) %>")
 exit
