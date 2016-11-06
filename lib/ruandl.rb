@@ -9,6 +9,7 @@ Dotenv.load
 require_relative 'ruandl/calculations'
 require_relative 'ruandl/quandl'
 require_relative 'ruandl/twitter'
+require_relative 'ruandl/highline'
 
 #if the stock matches the general Quandl format, ping the db to see if it's there
 def stock_check stock
@@ -26,29 +27,32 @@ def date_check date
   end
 end
 
-#using highline to style the CLI and help validate inputs
-cli = HighLine.new
+#highline styles the CLI and helps validate inputs
 
-ft = HighLine::ColorScheme.new do |cs|
-         cs[:output]          = [ :bold, :blue ]
-         cs[:alert]           = [ :bold, :red ]
-       end
-HighLine.color_scheme = ft
-say("<%= color('\nHi! I can help you look up the rate of return and maximum drawdown
-of any stock in the Quandl database within a particular time frame.\n', :output) %>")
+  cli = HighLine.new
 
-stock = cli.ask('<%= color("To start, please enter the ticker symbol (e.g., \"AAPL\")
-of the stock you\'d like to check.\\n", :output) %>') {
-  |q| q.validate = lambda { |s| stock_check s };
-  q.responses[:not_valid] = '<%= color("\\nThat doesn\'t seem to be in Quandl\'s database.
-  \\nYou can download the full list of available ticker symbols here\\: https\\:\\/\\/www\\.quandl\\.com\\/api\\/v3\\/databases\\/wiki\\/codes\\n", :alert) %>'
-}
-stock.upcase!
+  ft = HighLine::ColorScheme.new do |cs|
+           cs[:output]          = [ :bold, :blue ]
+           cs[:alert]           = [ :bold, :red ]
+         end
 
-input_date = cli.ask('<%= color("\\nHow far back do you want to look?\\n\\n(If the date you enter is outside the range found in Quandl\'s records, the results will start from the first available date.)\\n", :output) %>', String) {
-  |q| q.validate = lambda { |d| date_check d };
-  q.responses[:not_valid] = '<%= color("\\nPlease enter a valid date (e.g., \\"1983-10-27\\", \\"oct 27 1983\\", or \\"33 years ago\\") before today.\\n", :alert) %>'
-}
+  HighLine.color_scheme = ft
+  say("<%= color('\nHi! I can help you look up the rate of return and maximum drawdown
+  of any stock in the Quandl database within a particular time frame.\n', :output) %>")
+
+  stock = cli.ask('<%= color("To start, please enter the ticker symbol (e.g., \"AAPL\")
+  of the stock you\'d like to check.\\n", :output) %>') {
+    |q| q.validate = lambda { |s| stock_check s };
+    q.responses[:not_valid] = '<%= color("\\nThat doesn\'t seem to be in Quandl\'s database.
+    \\nYou can download the full list of available ticker symbols here\\: https\\:\\/\\/www\\.quandl\\.com\\/api\\/v3\\/databases\\/wiki\\/codes\\n", :alert) %>'
+  }
+  stock.upcase!
+
+  input_date = cli.ask('<%= color("\\nHow far back do you want to look?\\n\\n(If the date you enter is outside the range found in Quandl\'s records, the results will start from the first available date.)\\n", :output) %>', String) {
+    |q| q.validate = lambda { |d| date_check d };
+    q.responses[:not_valid] = '<%= color("\\nPlease enter a valid date (e.g., \\"1983-10-27\\", \\"oct 27 1983\\", or \\"33 years ago\\") before today.\\n", :alert) %>'
+  }
+
 
 #turning the (valid but not formatted) date input into a Time obj, then Date obj
 p_d = Chronic.parse(input_date).strftime('%Y-%m-%d')
