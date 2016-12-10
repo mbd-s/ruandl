@@ -1,4 +1,5 @@
 GEM
+  remote: https://rubygems.org/
   specs:
     addressable (2.4.0)
     buftok (0.2.0)
@@ -55,4 +56,4 @@ DEPENDENCIES
   twitter
 
 BUNDLED WITH
-   1.12.5
+   1.13.6
