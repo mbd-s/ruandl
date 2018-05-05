@@ -21,32 +21,23 @@ class Quandl
 
   def self.find_oldest_available_date(stock)
     response = get("/#{stock}/metadata.json")
-    if response.success?
-      response['dataset']['oldest_available_date']
-    else
-      raise response.response
-    end
+    raise response.response unless response.success?
+    response['dataset']['oldest_available_date']
   end
 
   def self.find_newest_available_date(stock)
     response = get("/#{stock}/metadata.json")
-    if response.success?
-      response['dataset']['newest_available_date']
-    else
-      raise response.response
-    end
+    raise response.response unless response.success?
+    response['dataset']['newest_available_date']
   end
 
   def self.get_prices(stock, start_date)
     response = get("/#{stock}.json?column_index=4&start_date=#{start_date}")
-    if response.success?
-      prices = []
-      response['dataset']['data'].reverse_each do |r|
-        prices.push(r[1])
-      end
-      prices
-    else
-      raise response.response
+    raise response.response unless response.success?
+    prices = []
+    response['dataset']['data'].reverse_each do |r|
+      prices.push(r[1])
     end
+    prices
   end
 end
