@@ -4,3 +4,4 @@ gem 'dotenv'
 gem 'httparty'
 gem 'highline'
 gem 'chronic'
+gem 'rubocop', require: false
